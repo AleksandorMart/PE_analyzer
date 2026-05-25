@@ -114,7 +114,7 @@ def extract_features(filepath: str) -> Dict[str, Any]:
                             
         features['imports_by_ordinal_count'] = imports_by_ordinal
         features['suspicious_api_count'] = suspicious_api_count
-        features['num_exports'] = len(getattr(pe, 'DIRECTORY_ENTRY_EXPORT', []))
+        features['num_exports'] = len(getattr(pe.DIRECTORY_ENTRY_EXPORT, 'symbols', [])) if hasattr(pe, 'DIRECTORY_ENTRY_EXPORT') else 0
         features['num_delay_imports'] = sum(len(imp.imports) for imp in getattr(pe, 'DIRECTORY_ENTRY_DELAY_IMPORT', []))
 
         # 4. Заголовки и размеры
