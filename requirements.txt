@@ -1,2 +1,7 @@
-pandas>=2.0.0
-pefile>=2023.2.0
+pandas
+pefile
+scikit-learn
+numpy
+matplotlib
+joblib
+seaborn

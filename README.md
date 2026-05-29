@@ -8,9 +8,9 @@ C:\Users\Ваше\_имя\Desktop\   (или любая другая удобн
 
 -         ├── build_dataset.py        # создание датасета
 
--         ├── model\_trainer.py       # будет позже
+-         ├── model\_trainer.py       # тренирует модели
 
--         ├── main\_app.py            # будет позже
+-         ├── main\_app.py            # основной скрипт классификатор
 
 -         ├── pe_dataset.csv          # датасет
 
