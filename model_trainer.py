@@ -47,8 +47,10 @@ model_results = {}
 plt.figure(figsize=(10, 8))
 plt.plot([0, 1], [0, 1], color='navy', lw=2, linestyle='--', label='Random Guess')
 
+roc_data = {}
+
 for name, model in models.items():
-    print(f"\n🔹 Обучение модели: {name}...")
+    print(f"\nОбучение модели: {name}...")
     model.fit(X_train_scaled, y_train)
     y_prob = model.predict_proba(X_test_scaled)[:, 1]
 
@@ -82,6 +84,9 @@ for name, model in models.items():
 
     # Добавляем ROC-кривую модели на общее окно графика
     plt.plot(fpr, tpr, lw=2, label=f'{name} (AUC = {roc_auc:.3f})')
+    
+    # Сохраняем данные ROC для последующего зум-графика
+    roc_data[name] = {'fpr': fpr, 'tpr': tpr, 'auc': roc_auc}
 
 # --- ФИНАЛИЗАЦИЯ И СОХРАНЕНИЕ ГРАФИКА ROC ---
 plt.xlim([0.0, 1.0])
@@ -95,7 +100,25 @@ plt.tight_layout()
 roc_filename = 'plots/roc_curves_comparison.png'
 plt.savefig(roc_filename, dpi=300, bbox_inches='tight')
 print(f"ROC-график сохранён: {roc_filename}")
-plt.show()
+plt.close()
+
+# --- СОХРАНЕНИЕ ЗУМ-ОБЛАСТИ ROC (0 <= FPR <= 0.15, 0.85 <= TPR <= 1.05) ---
+plt.figure(figsize=(10, 8))
+for name, data in roc_data.items():
+    plt.plot(data['fpr'], data['tpr'], lw=2, label=f"{name} (AUC = {data['auc']:.3f})")
+plt.plot([0, 1], [0, 1], color='navy', lw=2, linestyle='--', label='Random Guess')
+plt.xlim([0.0, 0.15])
+plt.ylim([0.85, 1.05])
+plt.xlabel('False Positive Rate (Zoomed: 0.0 - 0.15)')
+plt.ylabel('True Positive Rate (Zoomed: 0.85 - 1.0)')
+plt.title('ROC Curves - Critical Region (Low FPR, High TPR)')
+plt.legend(loc="lower right", fontsize=9)
+plt.grid(True, alpha=0.3)
+plt.tight_layout()
+zoom_filename = 'plots/roc_curves_zoom_critical_region.png'
+plt.savefig(zoom_filename, dpi=300, bbox_inches='tight')
+print(f"Zoom ROC-график сохранён: {zoom_filename}")
+plt.close()
 
 # --- СОХРАНЕНИЕ МОДЕЛЕЙ И МЕТРИК ---
 for name, data in model_results.items():
