@@ -6,7 +6,7 @@ C:\Users\Ваше\_имя\Desktop\   (или любая другая удобн
 
 -         ├── feature\_extractor.py   # сбор признаков
 
--         ├── build\_dataset.py       # создание датасета
+-         ├── build\_dataset.py       # создание датасета
 
 -         ├── model\_trainer.py       # тренирует модели
 
