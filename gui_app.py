@@ -10,14 +10,28 @@ from PIL import Image, ImageTk
 from feature_extractor import extract_features
 import datetime
 
+try:
+    import ctypes
+    # Задаем уникальный идентификатор приложения (может быть любой строкой)
+    my_app_id = 'mycompany.peanalyzer.app.v1'
+    ctypes.windll.shell32.SetCurrentProcessExplicitAppUserModelID(my_app_id)
+except Exception:
+    pass # Игнорируем ошибку, если скрипт запущен не в Windows
+
 # Объявляем основной класс приложения, инкапсулирующий всю логику интерфейса
 class PEAnalyzerGUI:
     
     # Инициализируем объект GUI при запуске
     def __init__(self):
         self.root = tk.Tk()  # Создаём главное окно приложения
-        self.root.title("PE Analyzer")  # Устанавливаем заголовок окна
+        self.root.title("PE Classifier")  # Устанавливаем заголовок окна
         self.root.geometry("900x700")  # Задаём начальные размеры окна
+        try:
+            # Устанавливаем иконку для окна (верхний левый угол) и панели задач Windows
+            self.root.iconbitmap("images.ico")
+        except tk.TclError:
+            # Если файл иконки не найден, программа не упадет, а просто продолжит работу со стандартной иконкой
+            pass
         self.root.resizable(True, True)  # Разрешаем изменение размеров окна пользователем
         self.msg_queue = queue.Queue()  # Создаём потокобезопасную очередь для передачи логов из рабочего потока в GUI
         self.scaler = None  # Инициализируем переменную для объекта стандартизации (пока None)

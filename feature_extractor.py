@@ -49,7 +49,6 @@ def extract_features(filepath: str) -> Dict[str, Any]:
     try:
         with open(filepath, 'rb') as f:
             raw_data = f.read()
-        # fast_load=True + parse_data_directories() дают баланс скорости и полноты парсинга
         pe = pefile.PE(filepath, fast_load=True)
         pe.parse_data_directories()
     except pefile.PEFormatError as e:
