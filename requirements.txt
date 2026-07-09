@@ -7,4 +7,4 @@ joblib
 seaborn
 Pillow
 openpyxl
-#pyinstaller
+pyinstaller
