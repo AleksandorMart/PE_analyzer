@@ -2,7 +2,6 @@
 # 🛡️ PE Analyzer — Инструмент классификации PE-файлов на основе машинного обучения
 
 [![Python 3.8+](https://img.shields.io/badge/python-3.8+-blue.svg)](https://www.python.org/downloads/)
-[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 [![Status](https://img.shields.io/badge/status-production--ready-green.svg)]()
 
 **PE Analyzer** — это десктопное приложение для автоматического анализа PE-файлов (Windows executables) с использованием ансамбля моделей машинного обучения. Инструмент позволяет специалистам по информационной безопасности быстро классифицировать файлы как безопасные или потенциально вредоносные.
