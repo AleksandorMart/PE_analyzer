@@ -9,6 +9,8 @@ import joblib
 from PIL import Image, ImageTk
 from feature_extractor import extract_features
 import datetime
+import openpyxl
+from openpyxl.styles import Border, Side
 
 try:
     import ctypes
@@ -39,6 +41,7 @@ class PEAnalyzerGUI:
         self.models_loaded = threading.Event()  # Создаём флаг синхронизации для ожидания загрузки моделей
         self.photo_refs = []  # Создаём список для хранения ссылок на изображения, чтобы сборщик мусора не удалял их
         self.session_results = {}  # Инициализируем словарь для хранения структурированных результатов по степеням подозрительности
+        self.model_order = ['GradientBoosting', 'LogisticRegression', 'ExtraTrees', 'RandomForest', 'SVC']  # Задаем фиксированный порядок моделей для вывода в логах и отчетах
         self._setup_ui()  # Вызываем метод построения интерфейса
         self._load_models_async()  # Запускаем асинхронную загрузку моделей в фоне
         self._poll_queue()  # Запускаем цикл опроса очереди сообщений для обновления текстового поля
@@ -80,8 +83,15 @@ class PEAnalyzerGUI:
         self.suspicion_entry.pack(side=tk.LEFT, padx=(5, 20))  # Размещаем поле с отступом
         self.classify_btn = ttk.Button(ctrl_frame, text="Классифицировать", command=self._start_classification)  # Создаём кнопку запуска анализа
         self.classify_btn.pack(side=tk.LEFT)  # Упаковываем кнопку запуска
-        self.report_btn = ttk.Button(ctrl_frame, text="Создать отчёт", command=self._create_report)  # Создаём кнопку отчёта (заглушка)
+        self.report_btn = ttk.Button(ctrl_frame, text="Создать отчёт", command=self._create_report)  # Создаём кнопку отчёта
         self.report_btn.pack(side=tk.LEFT, padx=(10, 0))  # Размещаем кнопку отчёта
+        
+        self.excel_btn = ttk.Button(ctrl_frame, text="Выгрузка в Excel", command=self._export_excel)  # Создаем кнопку выгрузки результатов в Excel
+        self.excel_btn.pack(side=tk.LEFT, padx=(10, 0))  # Размещаем кнопку
+        
+        self.clear_btn = ttk.Button(ctrl_frame, text="Очистка логов", command=self._clear_logs)  # Создаем кнопку очистки логов
+        self.clear_btn.pack(side=tk.LEFT, padx=(10, 0))  # Размещаем кнопку
+        
         res_frame = ttk.Frame(self.tab_classify)  # Создаём контейнер для поля вывода результатов
         res_frame.pack(fill=tk.BOTH, expand=True, padx=5, pady=5)  # Упаковываем контейнер с растяжением
         self.result_text = tk.Text(res_frame, wrap=tk.WORD, state=tk.DISABLED)  # Создаём многострочное поле вывода
@@ -227,11 +237,15 @@ class PEAnalyzerGUI:
             X.fillna(0, inplace=True)  # Заполняем пропуски
             Xs = self.scaler.transform(X)  # Масштабируем данные
             file_results = {'file': os.path.basename(fp), 'models': {}}  # Создаем словарь для хранения результатов конкретного файла
-            for name, mdl in self.models.items():  # Перебираем модели
-                prob = float(mdl.predict_proba(Xs)[0][1])  # Получаем вероятность Malware
-                pred = "Malware" if prob >= threshold else "Benign"  # Определяем метку
-                self._safe_log(f"  {name} -> {pred} (Вероятность: {prob:.4f})")  # Выводим результат
-                file_results['models'][name] = (pred, prob)  # Сохраняем предсказание и вероятность в структуру данных
+            
+            for name in self.model_order:  # Итерируем по моделям в заданном порядке, а не в произвольном порядке словаря
+                if name in self.models:  # Проверяем, загружена ли модель (на случай если какой-то модели нет в папке)
+                    mdl = self.models[name]
+                    prob = float(mdl.predict_proba(Xs)[0][1])  # Получаем вероятность Malware
+                    pred = "Malware" if prob >= threshold else "Benign"  # Определяем метку
+                    self._safe_log(f"  {name} -> {pred} (Вероятность: {prob:.4f})")  # Выводим результат
+                    file_results['models'][name] = (pred, prob)  # Сохраняем предсказание и вероятность в структуру данных
+                
             current_results.append(file_results)  # Добавляем результаты файла в список текущей сессии
         if susp in self.session_results:  # Проверяем, существуют ли уже результаты для данной степени подозрительности
             self.session_results[susp].extend(current_results)  # Добавляем новые результаты к существующему списку, сохраняя историю проверок
@@ -266,7 +280,9 @@ class PEAnalyzerGUI:
                     results = self.session_results[susp]  # Извлекаем список результатов проверки файлов, соответствующий именно этой степени подозрительности
                     if not results:  # Проверяем, не пуст ли список результатов (защита от генерации пустых таблиц)
                         continue  # Прерываем текущую итерацию цикла и переходим к обработке следующей степени подозрительности
-                    models = list(results[0]['models'].keys())  # Получаем список моделей из первого результата (набор моделей одинаков)
+                    
+                    models = [m for m in self.model_order if m in results[0]['models']]  # Используем заданный порядок моделей вместо произвольного из словаря
+                    
                     t_header = f"{'Файл':<40}" + "".join([f"{m:<20}" for m in models]) + "\n"  # Формируем строку заголовка таблицы: слово "Файл" выровнено по левому краю в 40 символов, за ним следуют названия моделей, каждое выровнено по левому краю в 20 символов
                     f.write(t_header)  # Записываем сформированную строку заголовка в текстовый файл
                     f.write("-" * len(t_header) + "\n")  # Записываем разделительную линию из дефисов, длина которой динамически рассчитывается и точно соответствует длине строки заголовка
@@ -285,6 +301,141 @@ class PEAnalyzerGUI:
             messagebox.showinfo("Успех", f"Отчет сохранен:\n{file_path}")  # Показываем всплывающее окно об успехе
         except Exception as e:  # Ловим ошибки ввода-вывода
             messagebox.showerror("Ошибка", f"Не удалось сохранить отчет:\n{e}")  # Выводим сообщение об ошибке
+    
+    # Реализация выгрузки результатов в Excel-файл с числовыми значениями для сортировки
+    def _export_excel(self):
+        # Проверяем наличие данных для выгрузки
+        if not self.session_results:
+            messagebox.showinfo("Информация", "Нет данных для выгрузки. Сначала выполните классификацию.")
+            return
+        
+        # Формируем имя файла по умолчанию с временной меткой
+        timestamp = datetime.datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
+        default_name = f"results_{timestamp}.xlsx"
+        
+        # Открываем диалог сохранения файла с фильтром для Excel
+        file_path = filedialog.asksaveasfilename(
+            defaultextension=".xlsx",
+            initialfile=default_name,
+            filetypes=[("Excel files", "*.xlsx")]
+        )
+        if not file_path: return  # Если пользователь отменил, выходим
+        
+        try:
+            # Собираем все результаты в единый словарь для дедупликации по имени файла
+            # Ключ — имя файла, значение — словарь вероятностей по моделям
+            unique_results = {}
+            
+            # Перебираем все степени подозрительности, так как один файл мог проверяться несколько раз
+            for susp, results in self.session_results.items():
+                for res in results:
+                    filename = res['file']
+                    # Если файл уже встречался, перезаписываем (вероятности одинаковые, т.к. не зависят от порога)
+                    # Это исключает дублирование строк в итоговой таблице
+                    if filename not in unique_results:
+                        unique_results[filename] = {}
+                    # Копируем вероятности по всем моделям в общий словарь
+                    for model_name in self.model_order:
+                        if model_name in res['models']:
+                            _, prob = res['models'][model_name]
+                            unique_results[filename][model_name] = round(prob, 4)
+                    
+            # Формируем список строк для единого DataFrame
+            data = []
+            for filename, models_probs in unique_results.items():
+                row = {'Файл': filename}
+                # Заполняем вероятности в заданном порядке моделей
+                for model_name in self.model_order:
+                    row[model_name] = models_probs.get(model_name, None)
+                data.append(row)
+                
+            # Создаем DataFrame из собранных данных
+            df = pd.DataFrame(data)
+            
+            # Создаем Excel-файл с одним листом "Results"
+            with pd.ExcelWriter(file_path, engine='openpyxl') as writer:
+                # Записываем DataFrame на единственный лист без индекса строк
+                df.to_excel(writer, sheet_name="Results", index=False)
+                
+                # Получаем объект рабочей книги и активного листа для постобработки
+                workbook = writer.book
+                worksheet = writer.sheets["Results"]
+                
+                # Включаем автофильтр для всего диапазона таблицы
+                # worksheet.dimensions автоматически возвращает координаты таблицы
+                worksheet.auto_filter.ref = worksheet.dimensions
+                
+                # Закрепляем первую строку (шапку таблицы)
+                # Указание ячейки A2 фиксирует строку 1
+                worksheet.freeze_panes = 'A2'
+                
+                # Определяем стиль тонкой границы для обводки всех ячеек таблицы
+                thin_border = Border(
+                    left=Side(style='thin'),
+                    right=Side(style='thin'),
+                    top=Side(style='thin'),
+                    bottom=Side(style='thin')
+                )
+                
+                # Проходим по всем колонкам для автовыравнивания ширины и применения границ
+                for col_idx, column_cells in enumerate(worksheet.columns, start=1):
+                    max_length = 0
+                    # Получаем букву колонки (A, B, C, ...) по её индексу
+                    col_letter = openpyxl.utils.get_column_letter(col_idx)
+                    
+                    # Перебираем все ячейки текущей колонки для поиска максимальной длины значения
+                    for cell in column_cells:
+                        # Применяем тонкую границу к каждой ячейке для обводки контуров таблицы
+                        cell.border = thin_border
+                        # Вычисляем длину строкового представления значения ячейки
+                        cell_text = str(cell.value) if cell.value is not None else ""
+                        if len(cell_text) > max_length:
+                            max_length = len(cell_text)
+                    
+                    # Устанавливаем ширину колонки с небольшим запасом для читаемости
+                    adjusted_width = max_length + 5
+                    worksheet.column_dimensions[col_letter].width = adjusted_width
+            
+            # Логируем успешное сохранение
+            self._safe_log(f"Результаты выгружены в Excel: {file_path}")
+            messagebox.showinfo("Успех", f"Результаты сохранены:\n{file_path}")
+        except Exception as e:
+            # Обрабатываем ошибки записи файла
+            messagebox.showerror("Ошибка", f"Не удалось сохранить Excel-файл:\n{e}")
+
+    # Метод для очистки логов
+    def _clear_logs(self):
+        # Проверяем, есть ли данные для очистки
+        has_logs = self.result_text.get("1.0", tk.END).strip()
+        has_results = bool(self.session_results)
+        
+        # Если нет ни логов, ни результатов, сообщаем пользователю
+        if not has_logs and not has_results:
+            messagebox.showinfo("Информация", "Нет данных для очистки.")
+            return
+        
+        # Запрашиваем подтверждение у пользователя
+        confirm = messagebox.askyesno(
+            "Подтверждение очистки",
+            "Вы уверены, что хотите очистить все логи и результаты проверки?\n\n"
+            "Это действие нельзя отменить. Убедитесь, что вы сохранили отчет, если он вам нужен."
+        )
+        
+        # Если пользователь отменил, выходим из метода
+        if not confirm:
+            return
+        
+        # Очищаем текстовое поле с логами
+        self.result_text.config(state=tk.NORMAL)
+        self.result_text.delete("1.0", tk.END)
+        self.result_text.config(state=tk.DISABLED)
+        
+        # Очищаем словарь с результатами сессии
+        self.session_results.clear()
+        
+        # Логируем действие очистки
+        self._safe_log("Логи и результаты проверки очищены.")
+        self._safe_log("Готово к новой сессии анализа.\n")
     
     # Обработчик события переключения вкладок
     def _on_tab_changed(self, event):

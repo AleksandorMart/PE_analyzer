@@ -1,0 +1,3 @@
+pyinstaller --noconsole --onefile --hidden-import=pefile --collect-all sklearn --collect-all pandas --name "PE Classifier" --icon=images.ico gui_app.py
+или быстрее но папкой
+pyinstaller --noconsole --hidden-import=pefile --collect-all sklearn --collect-all pandas --name "PE Classifier" --icon=images.ico gui_app.py

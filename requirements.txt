@@ -6,4 +6,5 @@ matplotlib
 joblib
 seaborn
 Pillow
+openpyxl
 #pyinstaller
